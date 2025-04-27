@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go CRUD App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        h1,
+        h2 {
+            color: #333;
+        }
+
+        .container {
+            display: flex;
+            gap: 20px;
+        }
+
+        .panel {
+            flex: 1;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            background-color: #f9f9f9;
+        }
+
+        .item {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: white;
+        }
+
+        .item h3 {
+            margin-top: 0;
+        }
+
+        input,
+        textarea,
+        button {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .delete-btn {
+            background-color: #f44336;
+            padding: 5px 10px;
+            margin-top: 10px;
+        }
+
+        .delete-btn:hover {
+            background-color: #d32f2f;
+        }
+
+        .save-btn {
+            background-color: #2196F3;
+        }
+
+        .save-btn:hover {
+            background-color: #0b7dda;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .button-group button {
+            flex: 1;
+        }
+
+        .status-message {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .success {
+            background-color: #dff0d8;
+            color: #3c763d;
+            border: 1px solid #d6e9c6;
+        }
+
+        .error {
+            background-color: #f2dede;
+            color: #a94442;
+            border: 1px solid #ebccd1;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Go CRUD Application</h1>
+
+    <div class="container">
+        <div class="panel">
+            <h2>Create New Item</h2>
+            <form id="create-form">
+                <div>
+                    <label for="item-id">ID:</label>
+                    <input type="text" id="item-id" required>
+                </div>
+                <div>
+                    <label for="item-name">Name:</label>
+                    <input type="text" id="item-name" required>
+                </div>
+                <div>
+                    <label for="item-description">Description:</label>
+                    <textarea id="item-description" rows="3" required></textarea>
+                </div>
+                <button type="submit">Create Item</button>
+            </form>
+        </div>
+
+        <div class="panel">
+            <h2>Update Item</h2>
+            <form id="update-form">
+                <div>
+                    <label for="update-id">Item ID:</label>
+                    <input type="text" id="update-id" required>
+                </div>
+                <div>
+                    <label for="update-name">New Name:</label>
+                    <input type="text" id="update-name" required>
+                </div>
+                <div>
+                    <label for="update-description">New Description:</label>
+                    <textarea id="update-description" rows="3" required></textarea>
+                </div>
+                <button type="submit">Update Item</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="panel" style="margin-top: 20px;">
+        <h2>All Items</h2>
+        <div class="button-group">
+            <button id="refresh-btn">Refresh Items</button>
+            <button id="save-db-btn" class="save-btn">Save Database</button>
+        </div>
+        <div id="status-message" class="status-message"></div>
+        <div id="items-container">
+            <!-- Items will be loaded here -->
+        </div>
+    </div>
+
+    <script>
+        // Base API URL
+        const API_URL = '/api/items';
+
+        // Helper function for API calls
+        async function apiCall(url, method, data = null) {
+            const options = {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            };
+
+            if (data) {
+                options.body = JSON.stringify(data);
+            }
+
+            const response = await fetch(url, options);
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`API Error: ${response.status} - ${errorText}`);
+            }
+
+            return response.json();
+        }
+
+        // Show status message
+        function showStatus(message, isError = false) {
+            const statusEl = document.getElementById('status-message');
+            statusEl.textContent = message;
+            statusEl.className = `status-message ${isError ? 'error' : 'success'}`;
+            statusEl.style.display = 'block';
+
+            // Hide after 5 seconds
+            setTimeout(() => {
+                statusEl.style.display = 'none';
+            }, 5000);
+        }
+
+        // Load all items
+        async function loadItems() {
+            try {
+                const items = await apiCall(API_URL, 'GET');
+                const container = document.getElementById('items-container');
+                container.innerHTML = '';
+
+                if (items.length === 0) {
+                    container.innerHTML = '<p>No items available. Create some!</p>';
+                    return;
+                }
+
+                items.forEach(item => {
+                    const itemElement = document.createElement('div');
+                    itemElement.className = 'item';
+                    itemElement.innerHTML = `
+                        <h3>${item.name} (ID: ${item.id})</h3>
+                        <p>${item.description}</p>
+                        <p><small>Created: ${new Date(item.created_at).toLocaleString()}</small></p>
+                        <p><small>Updated: ${new Date(item.updated_at).toLocaleString()}</small></p>
+                        <button class="delete-btn" data-id="${item.id}">Delete</button>
+                    `;
+                    container.appendChild(itemElement);
+                });
+
+                // Add event listeners to delete buttons
+                document.querySelectorAll('.delete-btn').forEach(btn => {
+                    btn.addEventListener('click', deleteItem);
+                });
+            } catch (error) {
+                showStatus(`Error loading items: ${error.message}`, true);
+                console.error(error);
+            }
+        }
+
+        // Create a new item
+        async function createItem(event) {
+            event.preventDefault();
+
+            const id = document.getElementById('item-id').value;
+            const name = document.getElementById('item-name').value;
+            const description = document.getElementById('item-description').value;
+
+            try {
+                await apiCall(API_URL, 'POST', { id, name, description });
+                showStatus('Item created successfully!');
+
+                // Clear form
+                document.getElementById('create-form').reset();
+
+                // Reload items
+                loadItems();
+            } catch (error) {
+                showStatus(`Error creating item: ${error.message}`, true);
+                console.error(error);
+            }
+        }
+
+        // Update an item
+        async function updateItem(event) {
+            event.preventDefault();
+
+            const id = document.getElementById('update-id').value;
+            const name = document.getElementById('update-name').value;
+            const description = document.getElementById('update-description').value;
+
+            try {
+                await apiCall(`${API_URL}/${id}`, 'PUT', { name, description });
+                showStatus('Item updated successfully!');
+
+                // Clear form
+                document.getElementById('update-form').reset();
+
+                // Reload items
+                loadItems();
+            } catch (error) {
+                showStatus(`Error updating item: ${error.message}`, true);
+                console.error(error);
+            }
+        }
+
+        // Delete an item
+        async function deleteItem(event) {
+            const id = event.target.getAttribute('data-id');
+
+            if (confirm(`Are you sure you want to delete item ${id}?`)) {
+                try {
+                    await apiCall(`${API_URL}/${id}`, 'DELETE');
+                    showStatus('Item deleted successfully!');
+
+                    // Reload items
+                    loadItems();
+                } catch (error) {
+                    showStatus(`Error deleting item: ${error.message}`, true);
+                    console.error(error);
+                }
+            }
+        }
+
+        // Save database
+        async function saveDatabase() {
+            try {
+                const response = await fetch('/api/db/save', {
+                    method: 'POST'
+                });
+
+                if (!response.ok) {
+                    const error = await response.text();
+                    throw new Error(`Save failed: ${error}`);
+                }
+
+                const result = await response.json();
+                showStatus(result.message || 'Database saved successfully!');
+            } catch (error) {
+                showStatus(`Error saving database: ${error.message}`, true);
+                console.error(error);
+            }
+        }
+
+        // Event listeners
+        document.getElementById('create-form').addEventListener('submit', createItem);
+        document.getElementById('update-form').addEventListener('submit', updateItem);
+        document.getElementById('refresh-btn').addEventListener('click', loadItems);
+        document.getElementById('save-db-btn').addEventListener('click', saveDatabase);
+
+        // Load items on page load
+        document.addEventListener('DOMContentLoaded', loadItems);
+    </script>
+</body>
+
+</html>
